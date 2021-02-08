@@ -44,7 +44,7 @@ async def pull_msg_from_kafka(consumer):
 @app.before_serving
 async def startup():
     logger.info("startup")
-    asyncio.gather(pull_msg_from_kafka(consumer))
+    #asyncio.gather(pull_msg_from_kafka(consumer))
 
 @app.after_serving
 async def shutdown():
