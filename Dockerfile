@@ -16,4 +16,4 @@ RUN pip install kafka-python
 
 # deploy with hypercorn
 ADD ./ /app/
-CMD hypercorn app:app
+CMD python app.py
