@@ -15,4 +15,4 @@ RUN pip install -i https://mirrors.aliyun.com/pypi/simple -r requirements.txt
 
 # deploy with hypercorn
 ADD ./ /app/
-CMD hypercorn --bind '0.0.0.0:80' run:app
+CMD hypercorn app:app
