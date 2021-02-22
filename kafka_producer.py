@@ -8,12 +8,12 @@ producer = KafkaProducer(bootstrap_servers='101.133.161.108:9092',
                          value_serializer=lambda v: json.dumps(v).encode())  # 连接kafka
 
 msg = "Hello World".encode('utf-8')  # 发送内容,必须是bytes类型
+
 for i in range(3):
     model = "model" + str(i)
-    future = producer.send(
-        'zztin',
-        key='model',  # 同一个key值，会被送至同一个分区
-        value=model)  # 向分区1发送消息
+    future = producer.send('zzt_test',
+                            key='model',  # 同一个key值，会被送至同一个分区
+                            value=model)  # 向分区1发送消息
     print("send {}".format(model))
     try:
         future.get(timeout=10)  # 监控是否发送成功

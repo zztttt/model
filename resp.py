@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 class Resp():
     def __init__(self):
         self.success_template = {"code": 200, "data": None}
-        self.fail_template = {"code": 400, "msg": "operation fail"}
+        self.fail_template = {"code": 500, "msg": "operation fail"}
 
     def success(self, data=None):
         self.success_template["data"] = data
