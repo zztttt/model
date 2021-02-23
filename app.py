@@ -172,7 +172,7 @@ async def create_model():
 
     # TODO test topic only
     # data_str = pull_msg(kafka_in_topic)
-    kafka_in_topic = "upload_topic"
+    # kafka_in_topic = "upload_topic"
 
     if not check_model(model_file_name):
         try:
