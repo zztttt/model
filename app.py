@@ -176,7 +176,8 @@ async def create_model():
         model = model_array[0]
         model_path = model['modelPath']
         in_parameter = model['inParameter']
-        model_file_name = model['modelFileName']
+        #model_file_name = model['modelFileName']
+        file_name = json_data['model'][0]['modelPath'].split('/')[-1]
         model_id = model['id']
     except JSONDecodeError as e:
         return resp.fail(e.msg)
@@ -188,10 +189,10 @@ async def create_model():
     # data_str = pull_msg(kafka_in_topic)
     # kafka_in_topic = "upload_topic"
 
-    if not check_model(model_file_name):
+    if not check_model(file_name):
         try:
             down_file = requests.get(url=model_path)
-            with open("lib/" + model_file_name, "wb") as code:
+            with open("lib/" + file_name, "wb") as code:
                 code.write(down_file.content)
             logger.info("downloading finish")
         except Exception as e:
@@ -202,13 +203,13 @@ async def create_model():
         logger.error(f"model_it:{model_id} is already existing")
         return resp.fail(f"model_it:{model_id} is already existing")
     try:
-        t = asyncio.ensure_future(execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name))
+        t = asyncio.ensure_future(execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, file_name))
         tasks[model_id] = t
     except Exception as e:
         logger.exception("")
         return resp.fail("execute model fail")
 
-    response = await make_response(resp.success(f"model_id:{model_id} is running"))
+    response = await make_response(resp.success(f"model_id:{model_id} file_name:{file_name} is running"))
     response.timeout = None  # No timeout for this route
     return response
 
@@ -245,9 +246,10 @@ async def executeModel():
         json_data = json.loads(request_data)
 
         instanceId = str(json_data['id']) + '_' + json_data['instanceName']
-        modelName = json_data['model'][0]['modelName']
-        modelFileName = json_data['model'][0]['modelFileName']
+        #modelName = json_data['model'][0]['modelName']
+        #modelFileName = json_data['model'][0]['modelFileName']
         modelPath = json_data['model'][0]['modelPath']
+        fileName = json_data['model'][0]['modelPath'].split('/')[-1]
 
     except JSONDecodeError as e:
         return resp.fail(e.msg)
@@ -255,10 +257,10 @@ async def executeModel():
         logger.exception("")
         return resp.fail("json value error")
 
-    if not check_model(instanceId):
+    if not check_model(fileName):
         try:
             down_file = requests.get(url=modelPath)
-            with open("lib/" + instanceId, "wb") as code:
+            with open("lib/" + fileName, "wb") as code:
                 code.write(down_file.content)
             logger.info("downloading finish")
         except Exception as e:
@@ -266,14 +268,17 @@ async def executeModel():
             return resp.fail("downloading model error. url:" + modelPath)
 
     try:
-        name = modelFileName[:-3]
+        name = fileName[:-3]
         metaclass = importlib.import_module("lib." + name)
         result = metaclass.execute()
+    except TypeError as e:
+        logger.exception("model execute() arguments error")
+        return resp.fail("model execute() arguments error")
     except Exception as e:
         logger.exception("execute model error")
-        return resp.fail("model execute error")
+        return resp.fail("execute model error")
 
-    response = await make_response(resp.success(modelFileName))
+    response = await make_response(resp.success(f"execute model: {fileName}"))
     response.timeout = None  # No timeout for this route
     return response
 
