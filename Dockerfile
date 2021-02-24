@@ -10,6 +10,7 @@ RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
 # python dependencies
 RUN mkdir -p /app
 WORKDIR /app
+COPY ./Ilib/ /app/Ilib/
 ADD ./requirements.txt /app/
 RUN pip install -i https://mirrors.aliyun.com/pypi/simple -r requirements.txt
 RUN pip install kafka-python
