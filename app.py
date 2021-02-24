@@ -106,13 +106,16 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
 @app.before_serving
 async def startup():
     logger.info("delete logs")
-    del_list = os.listdir('./logs')
-    for f in del_list:
-        file_path = os.path.join('./logs', f)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-        # elif os.path.isdir(file_path):
-        #     shutil.rmtree(file_path)
+    if not os.path.exists('./logs'):
+        os.mkdir('./logs')
+    else:
+        del_list = os.listdir('./logs')
+        for f in del_list:
+            file_path = os.path.join('./logs', f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            # elif os.path.isdir(file_path):
+            #     shutil.rmtree(file_path)
 
 
 @app.after_serving
