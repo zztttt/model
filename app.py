@@ -13,6 +13,7 @@ from resp import Resp
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 app = Quart(__name__)
 
 servers = ['101.133.161.108:9092']
@@ -24,25 +25,25 @@ tasks = {}
 result = None
 
 
-def pull_msg(topic):
+def pull_msg(topic, instance_logger):
     consumer = KafkaConsumer(topic, bootstrap_servers=servers, auto_offset_reset='earliest', group_id="zzt_group3")
     count = 0
     while True:
         msgs = consumer.poll(timeout_ms=50, max_records=1)
         if msgs:
-            logger.info("get msg")
+            instance_logger.info(f"get msg from topic:{topic}")
             # data = None
             for topicPartition in msgs:
                 list = msgs[topicPartition]
                 msg = list[0]
                 data = msg.value
-            logger.info(data)
+            instance_logger.info(data)
             consumer.close()
             return data
-        print("next loop")
+        #print("next loop")
         count = count + 1
         if count == 10:
-            logger.info("pull data time out")
+            instance_logger.info(f"pull data from topic:{topic} time out")
             consumer.close()
             return None
 
@@ -51,9 +52,13 @@ def check_model(model_file_name):
     return os.path.exists("./lib/" + model_file_name)
 
 
-async def execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name):
+async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name):
+    instance_logger = logging.getLogger(f'instance_logger{model_id}')
+    log_handler = logging.FileHandler('./logs/' + str(model_id))
+    instance_logger.addHandler(log_handler)
     while True:
-        data_str = pull_msg(kafka_in_topic)
+        instance_logger.info(f"model_id:{model_id} is scheduling")
+        data_str = pull_msg(kafka_in_topic, instance_logger)
         if data_str is not None:
             data_json = json.loads(data_str)
             args = []
@@ -63,10 +68,9 @@ async def execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_co
                 if key not in data_json:
                     return resp.fail("datasource error. key:" + key + " is not existing")
                 value = data_json[key]
-                # value = test_json[key]
                 args.append(value)
             except Exception as e:
-                logger.exception("parse argument error")
+                instance_logger.exception("parse argument error")
                 raise e
             try:
                 name = model_file_name[:-3]
@@ -74,7 +78,7 @@ async def execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_co
                 global result
                 result = metaclass.execute(*args)
             except Exception as e:
-                logger.exception("execute model error")
+                instance_logger.exception("execute model error")
                 raise e
             # send data
             data = {}
@@ -84,7 +88,7 @@ async def execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_co
                 data[column] = result
                 data_str = json.dumps(data)
             except Exception as e:
-                logger.exception("")
+                instance_logger.exception("")
                 raise e
 
             future = producer.send(kafka_out_topic,
@@ -92,16 +96,23 @@ async def execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_co
                                     value=data_str)  # 向分区1发送消息
             try:
                 future.get(timeout=10)  # 监控是否发送成功
-                logger.info(f'send message to kafka. data:{data_str}')
+                instance_logger.info(f'send message to kafka. data:{data_str}')
             except kafka_errors as e:  # 发送失败抛出kafka_errors
-                logger.exception("send to kafka error")
+                instance_logger.exception("send to kafka error")
                 raise e
-        await asyncio.sleep(1) #switch controller
+        await asyncio.sleep(5) #switch controller
 
 
 @app.before_serving
 async def startup():
-    logger.info("startup")
+    logger.info("delete logs")
+    del_list = os.listdir('./logs')
+    for f in del_list:
+        file_path = os.path.join('./logs', f)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+        # elif os.path.isdir(file_path):
+        #     shutil.rmtree(file_path)
 
 
 @app.after_serving
@@ -184,12 +195,15 @@ async def create_model():
             logger.exception("downloading model error")
             return resp.fail("downloading model error. url:" + model_path)
 
+    if model_id in tasks:
+        logger.error(f"model_it:{model_id} is already existing")
+        return resp.fail(f"model_it:{model_id} is already existing")
     try:
-        t = asyncio.ensure_future(execute_model(kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name))
+        t = asyncio.ensure_future(execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name))
+        tasks[model_id] = t
     except Exception as e:
         logger.exception("")
         return resp.fail("execute model fail")
-    tasks[model_id] = t
 
     response = await make_response(resp.success(f"model_id:{model_id} is running"))
     response.timeout = None  # No timeout for this route
@@ -210,6 +224,7 @@ async def stop():
             ret =  resp.fail(f"stop error. model_id:{id} is not running.")
         else:
             task.cancel()
+            tasks.pop(id)
             ret =  resp.success(f"stop model_id:{id} success.")
     except Exception as e:
         logger.exception("")
@@ -259,6 +274,14 @@ async def executeModel():
     response.timeout = None  # No timeout for this route
     return response
 
+@app.route('/showActiveInstance', methods=['GET'])
+async def show_active_instance():
+    ret = []
+    for k,v in tasks.items():
+        ret.append(k)
+    response = await make_response(resp.success(json.dumps(ret)))
+    response.timeout = None  # No timeout for this route
+    return response
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port='8000')
