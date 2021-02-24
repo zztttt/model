@@ -252,8 +252,10 @@ async def executeModel():
         fileName = json_data['model'][0]['modelPath'].split('/')[-1]
 
     except JSONDecodeError as e:
+        print(e)
         return resp.fail(e.msg)
     except Exception as e:
+        print(e)
         logger.exception("")
         return resp.fail("json value error")
 
@@ -264,6 +266,7 @@ async def executeModel():
                 code.write(down_file.content)
             logger.info("downloading finish")
         except Exception as e:
+            print(e)
             logger.exception("downloading model error")
             return resp.fail("downloading model error. url:" + modelPath)
 
@@ -272,9 +275,11 @@ async def executeModel():
         metaclass = importlib.import_module("lib." + name)
         result = metaclass.execute()
     except TypeError as e:
+        print(e)
         logger.exception("model execute() arguments error")
         return resp.fail("model execute() arguments error")
     except Exception as e:
+        print(e)
         logger.exception("execute model error")
         return resp.fail("execute model error")
 
