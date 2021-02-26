@@ -74,13 +74,13 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 key = in_config['input']['columnDefinition']
                 if key not in data_json:
                     instance_logger.exception("datasource error. key:" + key + " is not existing")
-                    raise ValueError
+                    continue
                 value = data_json[key]
                 args.append(value)
                 instance_logger.info("end parsing.")
             except Exception as e:
                 instance_logger.exception("parse argument error")
-                raise e
+                continue
             # import lib
             try:
                 instance_logger.info("start import lib.")
@@ -105,7 +105,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.info("end building.")
             except Exception as e:
                 instance_logger.exception("")
-                raise e
+                continue
 
             future = producer.send(kafka_out_topic,
                                     key='model',  # 同一个key值，会被送至同一个分区
@@ -116,7 +116,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.info(f'send message to kafka success. data:{data_str}')
             except kafka_errors as e:  # 发送失败抛出kafka_errors
                 instance_logger.exception("send to kafka error")
-                raise e
+                continue
         else:
             instance_logger.info("data_str is NONE. wait for next event_loop.")
         await asyncio.sleep(5) #switch controller
