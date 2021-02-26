@@ -12,7 +12,7 @@ import os
 from resp import Resp
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('app')
 
 app = Quart(__name__)
 
@@ -25,8 +25,10 @@ tasks = {}
 result = None
 
 
-def pull_msg(topic, instance_logger):
-    consumer = KafkaConsumer(topic, bootstrap_servers=servers, auto_offset_reset='earliest', group_id="zzt_group3")
+def pull_msg(topic, instance_logger, model_id):
+    instance_logger.info(f"start pull msg from topic: {topic}.")
+    consumer = KafkaConsumer(topic, bootstrap_servers=servers, auto_offset_reset='earliest', group_id=str(model_id))
+    instance_logger.info(f"connect to kafka success. start pull")
     count = 0
     while True:
         msgs = consumer.poll(timeout_ms=50, max_records=1)
@@ -39,13 +41,15 @@ def pull_msg(topic, instance_logger):
                 data = msg.value
             instance_logger.info(data)
             consumer.close()
+            instance_logger.info("end pull msg.")
             return data
-        #print("next loop")
-        count = count + 1
-        if count == 10:
-            instance_logger.info(f"pull data from topic:{topic} time out")
-            consumer.close()
-            return None
+        else:
+            count = count + 1
+            if count == 10:
+                instance_logger.info(f"pull data from topic:{topic} time out")
+                consumer.close()
+                instance_logger.info("end pull msg.")
+                return None
 
 
 def check_model(model_file_name):
@@ -58,8 +62,9 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
     instance_logger.addHandler(log_handler)
     while True:
         instance_logger.info(f"model_id:{model_id} is scheduling")
-        data_str = pull_msg(kafka_in_topic, instance_logger)
+        data_str = pull_msg(kafka_in_topic, instance_logger, model_id)
         if data_str is not None:
+            instance_logger.info("data_str is not none. start processing.")
             data_json = json.loads(data_str)
             args = []
             in_config = in_config_array[0]
@@ -73,8 +78,9 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.exception("parse argument error")
                 raise e
             try:
-                name = model_file_name[:-3]
-                metaclass = importlib.import_module("lib." + name)
+                name = "lib." + model_file_name[:-3]
+                instance_logger.info(f"import model_file:{name}")
+                metaclass = importlib.import_module(name)
                 global result
                 result = metaclass.execute(*args)
             except Exception as e:
@@ -83,6 +89,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
             # send data
             data = {}
             out_config = out_config_array[0]
+            instance_logger.info("start send result to kafka.")
             try:
                 column = out_config['output']['columnDefinition']
                 data[column] = result
@@ -96,10 +103,12 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                                     value=data_str)  # 向分区1发送消息
             try:
                 future.get(timeout=10)  # 监控是否发送成功
-                instance_logger.info(f'send message to kafka. data:{data_str}')
+                instance_logger.info(f'send message to kafka success. data:{data_str}')
             except kafka_errors as e:  # 发送失败抛出kafka_errors
                 instance_logger.exception("send to kafka error")
                 raise e
+        else:
+            instance_logger.info("data_str is none. wait for next event_loop.")
         await asyncio.sleep(5) #switch controller
 
 

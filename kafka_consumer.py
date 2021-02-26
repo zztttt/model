@@ -4,8 +4,8 @@ import traceback
 import importlib
 import json
 
-topic_in = "upload_topic"
-#topic_in = "zzt_test"
+topic_in = "ds_msg_gdtpdfresult"
+#topic_in = "upload_topic"
 topic = "zztout"
 consumer = KafkaConsumer(topic_in, bootstrap_servers=['101.133.161.108:9092'], auto_offset_reset='earliest', group_id="zzt_test5")
 producer = KafkaProducer(bootstrap_servers='101.133.161.108:9092',
