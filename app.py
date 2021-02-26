@@ -283,7 +283,7 @@ async def executeModel():
         logger.exception("execute model error")
         return resp.fail("execute model error")
 
-    response = await make_response(resp.success(f"execute model: {fileName}"))
+    response = await make_response(resp.success(f"execute model: {fileName}" + result))
     response.timeout = None  # No timeout for this route
     return response
 
