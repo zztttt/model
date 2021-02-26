@@ -73,7 +73,8 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 in_config = in_config_array[0]
                 key = in_config['input']['columnDefinition']
                 if key not in data_json:
-                    return resp.fail("datasource error. key:" + key + " is not existing")
+                    instance_logger.exception("datasource error. key:" + key + " is not existing")
+                    raise ValueError
                 value = data_json[key]
                 args.append(value)
                 instance_logger.info("end parsing.")
