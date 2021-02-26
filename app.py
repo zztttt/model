@@ -91,8 +91,8 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 result = metaclass.execute(*args)
                 instance_logger.info("end execute lib.")
             except Exception as e:
-                instance_logger.exception("execute model error")
-                raise e
+                instance_logger.exception("execute model error. execute next message.")
+                continue
             # send data
             try:
                 instance_logger.info("start building data.")
