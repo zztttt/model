@@ -7,7 +7,7 @@ import json
 topic_in = "ds_msg_gdtpdfresult"
 #topic_in = "upload_topic"
 topic = "zztout"
-consumer = KafkaConsumer(topic_in, bootstrap_servers=['101.133.161.108:9092'], auto_offset_reset='earliest', group_id="zzt_test5")
+consumer = KafkaConsumer(topic_in, bootstrap_servers=['101.133.161.108:9092'], auto_offset_reset='earliest', group_id="zzt_test6")
 producer = KafkaProducer(bootstrap_servers='101.133.161.108:9092',
                          key_serializer=lambda k: json.dumps(k).encode(),
                          value_serializer=lambda v: json.dumps(v).encode())  # 连接kafka
@@ -24,6 +24,8 @@ if __name__ == '__main__':
                 msg = list[0]
                 data = msg.value
             print(data)
+            data_json = json.loads(data)
+            data_json['new'] = 123
             consumer.close()
             break
         print("next loop")

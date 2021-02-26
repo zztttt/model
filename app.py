@@ -56,7 +56,7 @@ def check_model(model_file_name):
     return os.path.exists("./lib/" + model_file_name)
 
 
-async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name):
+async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name, json):
     instance_logger = logging.getLogger(f'instance_logger{model_id}')
     log_handler = logging.FileHandler('./logs/' + str(model_id))
     instance_logger.addHandler(log_handler)
@@ -96,12 +96,11 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
             # send data
             try:
                 instance_logger.info("start building data.")
-                data = {}
                 out_config = out_config_array[0]
                 instance_logger.info("start send result to kafka.")
                 column = out_config['output']['columnDefinition']
-                data[column] = result
-                data_str = json.dumps(data)
+                data_json[column] = result
+                data_str = json.dumps(data_json)
                 instance_logger.info("end building.")
             except Exception as e:
                 instance_logger.exception("")
