@@ -65,35 +65,43 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
         data_str = pull_msg(kafka_in_topic, instance_logger, model_id)
         if data_str is not None:
             instance_logger.info("data_str is not none. start processing.")
-            data_json = json.loads(data_str)
-            args = []
-            in_config = in_config_array[0]
+            # parse argument
             try:
+                instance_logger.info("start parsing argument.")
+                data_json = json.loads(data_str)
+                args = []
+                in_config = in_config_array[0]
                 key = in_config['input']['columnDefinition']
                 if key not in data_json:
                     return resp.fail("datasource error. key:" + key + " is not existing")
                 value = data_json[key]
                 args.append(value)
+                instance_logger.info("end parsing.")
             except Exception as e:
                 instance_logger.exception("parse argument error")
                 raise e
+            # import lib
             try:
+                instance_logger.info("start import lib.")
                 name = "lib." + model_file_name[:-3]
                 instance_logger.info(f"import model_file:{name}")
                 metaclass = importlib.import_module(name)
                 global result
                 result = metaclass.execute(*args)
+                instance_logger.info("end execute lib.")
             except Exception as e:
                 instance_logger.exception("execute model error")
                 raise e
             # send data
-            data = {}
-            out_config = out_config_array[0]
-            instance_logger.info("start send result to kafka.")
             try:
+                instance_logger.info("start building data.")
+                data = {}
+                out_config = out_config_array[0]
+                instance_logger.info("start send result to kafka.")
                 column = out_config['output']['columnDefinition']
                 data[column] = result
                 data_str = json.dumps(data)
+                instance_logger.info("end building.")
             except Exception as e:
                 instance_logger.exception("")
                 raise e
@@ -102,13 +110,14 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                                     key='model',  # 同一个key值，会被送至同一个分区
                                     value=data_str)  # 向分区1发送消息
             try:
+                instance_logger.info("start sending data.")
                 future.get(timeout=10)  # 监控是否发送成功
                 instance_logger.info(f'send message to kafka success. data:{data_str}')
             except kafka_errors as e:  # 发送失败抛出kafka_errors
                 instance_logger.exception("send to kafka error")
                 raise e
         else:
-            instance_logger.info("data_str is none. wait for next event_loop.")
+            instance_logger.info("data_str is NONE. wait for next event_loop.")
         await asyncio.sleep(5) #switch controller
 
 
@@ -187,7 +196,7 @@ async def create_model():
         in_parameter = model['inParameter']
         #model_file_name = model['modelFileName']
         file_name = json_data['model'][0]['modelPath'].split('/')[-1]
-        model_id = model['id']
+        model_id = json_data['id']
     except JSONDecodeError as e:
         return resp.fail(e.msg)
     except Exception as e:
