@@ -56,7 +56,7 @@ def check_model(model_file_name):
     return os.path.exists("./lib/" + model_file_name)
 
 
-async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name, json):
+async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_array, out_config_array, model_file_name):
     instance_logger = logging.getLogger(f'instance_logger{model_id}')
     log_handler = logging.FileHandler('./logs/' + str(model_id))
     instance_logger.addHandler(log_handler)
@@ -74,12 +74,14 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 key = in_config['input']['columnDefinition']
                 if key not in data_json:
                     instance_logger.exception("datasource error. key:" + key + " is not existing")
+                    await asyncio.sleep(0)
                     continue
                 value = data_json[key]
                 args.append(value)
                 instance_logger.info("end parsing.")
             except Exception as e:
                 instance_logger.exception("parse argument error")
+                await asyncio.sleep(0)
                 continue
             # import lib
             try:
@@ -92,6 +94,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.info("end execute lib.")
             except Exception as e:
                 instance_logger.exception("execute model error. execute next message.")
+                await asyncio.sleep(0)
                 continue
             # send data
             try:
@@ -104,6 +107,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.info("end building.")
             except Exception as e:
                 instance_logger.exception("")
+                await asyncio.sleep(0)
                 continue
 
             future = producer.send(kafka_out_topic,
@@ -115,6 +119,7 @@ async def execute_model(model_id, kafka_in_topic, kafka_out_topic, in_config_arr
                 instance_logger.info(f'send message to kafka success. data:{data_str}')
             except kafka_errors as e:  # 发送失败抛出kafka_errors
                 instance_logger.exception("send to kafka error")
+                await asyncio.sleep(0)
                 continue
         else:
             instance_logger.info("data_str is NONE. wait for next event_loop.")
@@ -194,7 +199,6 @@ async def create_model():
         model = model_array[0]
         model_path = model['modelPath']
         in_parameter = model['inParameter']
-        #model_file_name = model['modelFileName']
         file_name = json_data['model'][0]['modelPath'].split('/')[-1]
         model_id = json_data['id']
     except JSONDecodeError as e:
@@ -225,7 +229,7 @@ async def create_model():
         tasks[model_id] = t
     except Exception as e:
         logger.exception("")
-        return resp.fail("execute model fail")
+        return resp.fail("execute model fail. aynicio.ensure_future(...) error.")
 
     response = await make_response(resp.success(f"model_id:{model_id} file_name:{file_name} is running"))
     response.timeout = None  # No timeout for this route
@@ -239,12 +243,10 @@ async def stop():
     try:
         json_data = json.loads(request_data)
         id = json_data['id']
-        if id is None:
-            ret =  resp.fail(f"json error. {id} is not existing.")
-        task = tasks[id]
-        if task is None:
-            ret =  resp.fail(f"stop error. model_id:{id} is not running.")
+        if id not in tasks:
+            ret = resp.fail(f"stop error. {id} is not running.")
         else:
+            task = tasks[id]
             task.cancel()
             tasks.pop(id)
             ret =  resp.success(f"stop model_id:{id} success.")
